@@ -1,0 +1,147 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tabela Química Interativa</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; }
+  body { background: white; color: #222; overflow: hidden; }
+  #sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 250px; overflow-y: auto;
+    background: linear-gradient(180deg, #0078ff, #00d4ff); padding: 10px;
+    border-right: 3px solid #0094ff; box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+  }
+  #search { width: 100%; padding: 10px; border: none; border-radius: 10px; margin-bottom: 10px; }
+  .element {
+    background: white; color: #0078ff; margin: 6px 0; padding: 8px; border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1); cursor: grab; text-align: center; font-weight: 600;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .element:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  #workspace {
+    position: absolute; left: 250px; top: 0; right: 0; bottom: 30px;
+    background: white; overflow: hidden; padding: 20px; display: flex; flex-wrap: wrap;
+  }
+  .atom {
+    width: 80px; height: 80px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; text-align: center; color: white;
+    font-weight: bold; cursor: pointer; position: absolute;
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  .atom:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  #footer {
+    position: fixed; bottom: 5px; right: 10px; font-size: 12px; color: #999;
+  }
+  #modal {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    display: none; width: 300px; z-index: 10;
+  }
+  #modal h2 { margin-bottom: 10px; color: #0078ff; }
+  #closeModal { background: #0078ff; color: white; border: none; padding: 5px 10px; border-radius: 8px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <input type="text" id="search" placeholder="Pesquisar elemento...">
+  <div id="elementList"></div>
+</div>
+
+<div id="workspace"></div>
+<div id="modal">
+  <h2 id="modalTitle"></h2>
+  <p id="modalInfo"></p>
+  <button id="closeModal">Fechar</button>
+</div>
+<div id="footer">Produced by: Genius</div>
+
+<script>
+const elements = [
+  { name: "Hidrogênio", symbol: "H", family: "Não metal", desc: "O mais leve dos elementos." },
+  { name: "Hélio", symbol: "He", family: "Gás nobre", desc: "Gás inerte usado em balões." },
+  { name: "Lítio", symbol: "Li", family: "Metal alcalino", desc: "Usado em baterias." },
+  { name: "Berílio", symbol: "Be", family: "Metal alcalino-terroso", desc: "Elemento raro." },
+  { name: "Boro", symbol: "B", family: "Semimetal", desc: "Usado em vidros especiais." },
+  { name: "Carbono", symbol: "C", family: "Não metal", desc: "Base da vida orgânica." },
+  { name: "Nitrogênio", symbol: "N", family: "Não metal", desc: "Componente do ar." },
+  { name: "Oxigênio", symbol: "O", family: "Não metal", desc: "Essencial à respiração." },
+  { name: "Flúor", symbol: "F", family: "Halogênio", desc: "Usado em pastas de dente." },
+  { name: "Sódio", symbol: "Na", family: "Metal alcalino", desc: "Presente no sal de cozinha." },
+  { name: "Magnésio", symbol: "Mg", family: "Metal alcalino-terroso", desc: "Importante para o corpo." },
+  { name: "Alumínio", symbol: "Al", family: "Metal", desc: "Leve e resistente." },
+  { name: "Silício", symbol: "Si", family: "Semimetal", desc: "Base da eletrônica." },
+  { name: "Fósforo", symbol: "P", family: "Não metal", desc: "Usado em fertilizantes." },
+  { name: "Enxofre", symbol: "S", family: "Não metal", desc: "Amarelo, com cheiro forte." },
+  { name: "Cloro", symbol: "Cl", family: "Halogênio", desc: "Usado para purificar água." },
+  { name: "Potássio", symbol: "K", family: "Metal alcalino", desc: "Essencial aos músculos." },
+  { name: "Cálcio", symbol: "Ca", family: "Metal alcalino-terroso", desc: "Fortalece ossos e dentes." },
+  { name: "Ferro", symbol: "Fe", family: "Metal", desc: "Usado em ligas metálicas." },
+  { name: "Cobre", symbol: "Cu", family: "Metal", desc: "Condutor de eletricidade." },
+  { name: "Zinco", symbol: "Zn", family: "Metal", desc: "Usado em galvanização." },
+  { name: "Prata", symbol: "Ag", family: "Metal nobre", desc: "Brilhante e condutora." },
+  { name: "Ouro", symbol: "Au", family: "Metal nobre", desc: "Muito valorizado." },
+  { name: "Mercúrio", symbol: "Hg", family: "Metal líquido", desc: "Líquido à temperatura ambiente." },
+  { name: "Chumbo", symbol: "Pb", family: "Metal pesado", desc: "Denso e tóxico." }
+];
+
+const familyColors = {
+  "Metal": "#ffa500",
+  "Metal alcalino": "#ff4500",
+  "Metal alcalino-terroso": "#ff6347",
+  "Metal nobre": "#ffd700",
+  "Metal líquido": "#ffb6c1",
+  "Metal pesado": "#a0522d",
+  "Não metal": "#32cd32",
+  "Gás nobre": "#00ced1",
+  "Halogênio": "#1e90ff",
+  "Semimetal": "#ba55d3"
+};
+
+const sidebar = document.getElementById('elementList');
+const workspace = document.getElementById('workspace');
+const modal = document.getElementById('modal');
+const search = document.getElementById('search');
+
+elements.forEach(el => {
+  const div = document.createElement('div');
+  div.className = 'element';
+  div.textContent = el.symbol + " - " + el.name;
+  div.draggable = true;
+  div.addEventListener('dragstart', e => e.dataTransfer.setData('text', JSON.stringify(el)));
+  sidebar.appendChild(div);
+});
+
+workspace.addEventListener('dragover', e => e.preventDefault());
+workspace.addEventListener('drop', e => {
+  e.preventDefault();
+  const data = JSON.parse(e.dataTransfer.getData('text'));
+  const atom = document.createElement('div');
+  atom.className = 'atom';
+  atom.textContent = data.symbol;
+  atom.style.background = familyColors[data.family] || '#888';
+  atom.style.left = e.pageX - 40 + 'px';
+  atom.style.top = e.pageY - 40 + 'px';
+  atom.addEventListener('click', () => openModal(data));
+  workspace.appendChild(atom);
+});
+
+function openModal(data) {
+  modal.style.display = 'block';
+  document.getElementById('modalTitle').textContent = data.name;
+  document.getElementById('modalInfo').textContent = data.desc + "\nFamília: " + data.family;
+}
+document.getElementById('closeModal').onclick = () => modal.style.display = 'none';
+
+search.addEventListener('input', e => {
+  const term = e.target.value.toLowerCase();
+  Array.from(sidebar.children).forEach(div => {
+    div.style.display = div.textContent.toLowerCase().includes(term) ? 'block' : 'none';
+  });
+});
+</script>
+
+</body>
+</html>
