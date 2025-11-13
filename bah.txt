@@ -1,0 +1,602 @@
+ <!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Periodic Drag — Genius</title>
+<style>
+  :root{
+    --bg:#ffffff; --paper:#fbfcfd; --muted:#6b7280; --card-border:#e6e9ee;
+    --accent:#0ea5ff; --glass: rgba(255,255,255,0.7);
+    --shadow: 0 6px 18px rgba(12,24,40,0.06);
+    --radius:12px;
+  }
+  [data-theme="dark"]{
+    --bg:#0b1220; --paper:#07101a; --muted:#9aa4b2; --card-border:#12202b;
+    --accent:#38bdf8; --glass: rgba(255,255,255,0.03);
+    --shadow: 0 8px 30px rgba(2,6,23,0.6);
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial;color: #0b1220;background:var(--bg);-webkit-font-smoothing:antialiased}
+  .app{display:flex;height:100vh;gap:12px;padding:12px}
+
+  /* SIDEBAR */
+  .sidebar{width:320px;background:var(--paper);border-radius:var(--radius);padding:12px;border:1px solid var(--card-border);box-shadow:var(--shadow);display:flex;flex-direction:column;transition:width .22s ease}
+  .sidebar.collapsed{width:72px}
+  .sb-top{display:flex;align-items:center;gap:8px}
+  .btn-ghost{background:transparent;border:0;padding:8px;border-radius:8px;cursor:pointer}
+  .title{font-weight:700}
+  .search{margin-top:10px;display:flex;gap:8px}
+  .search input{flex:1;padding:10px;border-radius:10px;border:1px solid var(--card-border);background:transparent;outline:none;color:inherit}
+  .search button{padding:10px 12px;border-radius:10px;border:0;background:var(--accent);color:white;cursor:pointer}
+  .list{margin-top:10px;overflow:auto;padding-right:6px}
+  .el-item{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(180deg,transparent,transparent);padding:8px;border-radius:8px;border:1px solid transparent;cursor:grab;transition:transform .14s ease,box-shadow .14s ease}
+  .el-item:hover{transform:translateY(-4px);box-shadow:0 6px 18px rgba(2,6,23,0.06)}
+  .el-left{display:flex;gap:10px;align-items:center}
+  .badge-symbol{width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px}
+  .el-meta{display:flex;flex-direction:column}
+  .el-name{font-size:13px;font-weight:600}
+  .el-sub{font-size:12px;color:var(--muted)}
+  .family-color{width:10px;height:34px;border-radius:6px;margin-left:8px}
+
+  /* WORKSPACE */
+  .workspace{flex:1;display:flex;flex-direction:column;gap:12px}
+  .controls{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .left-controls{display:flex;gap:8px;align-items:center}
+  .btn{padding:8px 12px;border-radius:10px;border:0;background:var(--accent);color:white;cursor:pointer}
+  .btn.secondary{background:transparent;border:1px solid var(--card-border);color:var(--muted)}
+  .stage{flex:1;background:linear-gradient(180deg,var(--glass),transparent);border-radius:var(--radius);padding:16px;border:1px solid var(--card-border);overflow:auto;box-shadow:var(--shadow);position:relative}
+  .grid{display:flex;flex-wrap:wrap;gap:12px}
+
+  /* CARD */
+  .card{min-width:160px;max-width:220px;padding:12px;border-radius:10px;background:var(--paper);border:1px solid var(--card-border);box-shadow:0 8px 20px rgba(2,6,23,0.04);display:flex;flex-direction:column;gap:8px;cursor:grab;transition:transform .14s ease,box-shadow .14s ease}
+  .card:active{cursor:grabbing}
+  .card.hovering{transform:scale(1.02);box-shadow:0 14px 36px rgba(2,6,23,0.08)}
+  .card-top{display:flex;justify-content:space-between;align-items:start}
+  .sym{font-size:28px;font-weight:800}
+  .meta{font-size:12px;color:var(--muted)}
+  .bitgrid{display:inline-block;padding:8px;border-radius:8px;background:transparent;border:1px dashed var(--card-border)}
+  .bitrow{display:flex}
+  .bitcell{width:8px;height:8px;border-radius:2px;margin:2px;background:#f0f2f5}
+  .bitcell.on{background:#0f1724}
+
+  /* modal */
+  .modal-back{position:fixed;inset:0;background:rgba(2,6,23,0.45);display:flex;align-items:center;justify-content:center;z-index:60}
+  .modal{background:var(--paper);padding:18px;border-radius:12px;border:1px solid var(--card-border);max-width:760px;width:94%}
+  .modal h3{margin:0}
+
+  /* Produced by */
+  .smallfoot{position:fixed;right:18px;bottom:12px;font-size:11px;color:var(--muted)}
+
+  /* families colors */
+  .f-Nonmetal{background:#ef4444;color:white}
+  .f-Noble\ gas{background:#60a5fa;color:white}
+  .f-Alkali\ metal{background:#fb923c;color:white}
+  .f-Alkaline\ earth\ metal{background:#fde047;color:#111}
+  .f-Metalloid{background:#a78bfa;color:white}
+  .f-Transition\ metal{background:#94a3b8;color:white}
+  .f-Post-transition\ metal{background:#f97316;color:white}
+  .f-Halogen{background:#34d399;color:white}
+  .f-Lanthanide{background:#fda4af;color:white}
+  .f-Actinide{background:#fca5a5;color:white}
+  .f-Unknown{background:#94a3b8;color:white}
+
+  /* responsive */
+  @media (max-width:900px){
+    .app{flex-direction:column;padding:10px}
+    .sidebar{width:100%}
+    .sidebar.collapsed{width:100%}
+    .workspace{width:100%}
+  }
+</style>
+</head>
+<body data-theme="light">
+<div style="display:flex;gap:12px;align-items:center;padding:12px">
+  <div style="font-weight:800;font-size:18px">Periodic Drag</div>
+  <div style="color:var(--muted)">— arraste, combine e explore elementos e ligas</div>
+  <div style="flex:1"></div>
+  <button id="themeToggle" class="btn secondary" title="Alternar tema">Modo escuro</button>
+</div>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-top">
+      <button id="toggleSidebar" class="btn-ghost" title="Retrair/expandir">☰</button>
+      <div class="title" id="sbTitle">Elementos</div>
+      <div style="flex:1"></div>
+      <button id="saveBtn" class="btn secondary" title="Salvar soluções">Salvar (.json)</button>
+    </div>
+
+    <div class="search">
+      <input id="search" placeholder="Pesquisar (nome ou símbolo)" />
+      <button id="clearSearch" class="btn secondary">Limpar</button>
+    </div>
+
+    <div class="list" id="list"></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px">Dica: arraste um elemento da lista para a área; arraste um cartão sobre outro para combinar; arraste de volta para a barra para remover.</div>
+  </aside>
+
+  <main class="workspace">
+    <div class="controls">
+      <div class="left-controls">
+        <button id="clearWorkspace" class="btn secondary">Limpar área</button>
+        <button id="presetAlloys" class="btn">Inserir exemplos</button>
+      </div>
+      <div style="color:var(--muted);font-size:13px">Produced by: Genius</div>
+    </div>
+
+    <section class="stage" id="stage" ondragover="event.preventDefault()">
+      <div class="grid" id="grid"></div>
+    </section>
+  </main>
+</div>
+
+<div class="smallfoot">Produced by: Genius</div>
+
+<!-- modal root -->
+<div id="modalRoot"></div>
+
+<script>
+/* ------------------------------
+   Data: elementos (118) inline
+   ------------------------------ */
+const ELEMENTS = [
+{"z":1,"symbol":"H","name":"Hydrogen","family":"Nonmetal","mass":1.008,"desc":"Lightest element, gas."},
+{"z":2,"symbol":"He","name":"Helium","family":"Noble gas","mass":4.0026,"desc":"Inert noble gas."},
+{"z":3,"symbol":"Li","name":"Lithium","family":"Alkali metal","mass":6.94,"desc":"Soft, reactive metal."},
+{"z":4,"symbol":"Be","name":"Beryllium","family":"Alkaline earth metal","mass":9.0122,"desc":"Light, rigid metal."},
+{"z":5,"symbol":"B","name":"Boron","family":"Metalloid","mass":10.81,"desc":"Metalloid with special properties."},
+{"z":6,"symbol":"C","name":"Carbon","family":"Nonmetal","mass":12.011,"desc":"Basis of organic chemistry."},
+{"z":7,"symbol":"N","name":"Nitrogen","family":"Nonmetal","mass":14.007,"desc":"Major component of air."},
+{"z":8,"symbol":"O","name":"Oxygen","family":"Nonmetal","mass":15.999,"desc":"Essential for respiration."},
+{"z":9,"symbol":"F","name":"Fluorine","family":"Halogen","mass":18.998,"desc":"Very reactive halogen."},
+{"z":10,"symbol":"Ne","name":"Neon","family":"Noble gas","mass":20.180,"desc":"Inert gas used in signs."},
+{"z":11,"symbol":"Na","name":"Sodium","family":"Alkali metal","mass":22.990,"desc":"Reactive soft metal."},
+{"z":12,"symbol":"Mg","name":"Magnesium","family":"Alkaline earth metal","mass":24.305,"desc":"Light metal, reacts with acids."},
+{"z":13,"symbol":"Al","name":"Aluminium","family":"Post-transition metal","mass":26.982,"desc":"Light, corrosion-resistant."},
+{"z":14,"symbol":"Si","name":"Silicon","family":"Metalloid","mass":28.085,"desc":"Semiconductor, abundant."},
+{"z":15,"symbol":"P","name":"Phosphorus","family":"Nonmetal","mass":30.974,"desc":"Important in biology."},
+{"z":16,"symbol":"S","name":"Sulfur","family":"Nonmetal","mass":32.06,"desc":"Yellow solid, used industrially."},
+{"z":17,"symbol":"Cl","name":"Chlorine","family":"Halogen","mass":35.45,"desc":"Reactive, used for disinfection."},
+{"z":18,"symbol":"Ar","name":"Argon","family":"Noble gas","mass":39.948,"desc":"Inert gas used in lights."},
+{"z":19,"symbol":"K","name":"Potassium","family":"Alkali metal","mass":39.098,"desc":"Very reactive metal."},
+{"z":20,"symbol":"Ca","name":"Calcium","family":"Alkaline earth metal","mass":40.078,"desc":"Important for bones."},
+{"z":21,"symbol":"Sc","name":"Scandium","family":"Transition metal","mass":44.956,"desc":"Light transition metal."},
+{"z":22,"symbol":"Ti","name":"Titanium","family":"Transition metal","mass":47.867,"desc":"Strong, corrosion-resistant."},
+{"z":23,"symbol":"V","name":"Vanadium","family":"Transition metal","mass":50.942,"desc":"Used in steel alloys."},
+{"z":24,"symbol":"Cr","name":"Chromium","family":"Transition metal","mass":51.996,"desc":"Hard, corrosion-resistant."},
+{"z":25,"symbol":"Mn","name":"Manganese","family":"Transition metal","mass":54.938,"desc":"Used in alloys."},
+{"z":26,"symbol":"Fe","name":"Iron","family":"Transition metal","mass":55.845,"desc":"Core metal of steel."},
+{"z":27,"symbol":"Co","name":"Cobalt","family":"Transition metal","mass":58.933,"desc":"Used in batteries and alloys."},
+{"z":28,"symbol":"Ni","name":"Nickel","family":"Transition metal","mass":58.693,"desc":"Magnetic transition metal."},
+{"z":29,"symbol":"Cu","name":"Copper","family":"Transition metal","mass":63.546,"desc":"Conductive, used in wiring."},
+{"z":30,"symbol":"Zn","name":"Zinc","family":"Transition metal","mass":65.38,"desc":"Used for galvanizing steel."},
+{"z":31,"symbol":"Ga","name":"Gallium","family":"Post-transition metal","mass":69.723,"desc":"Melts near room temperature."},
+{"z":32,"symbol":"Ge","name":"Germanium","family":"Metalloid","mass":72.630,"desc":"Semiconductor element."},
+{"z":33,"symbol":"As","name":"Arsenic","family":"Metalloid","mass":74.922,"desc":"Toxic metalloid."},
+{"z":34,"symbol":"Se","name":"Selenium","family":"Nonmetal","mass":78.971,"desc":"Important trace element."},
+{"z":35,"symbol":"Br","name":"Bromine","family":"Halogen","mass":79.904,"desc":"Red-brown liquid at room temp."},
+{"z":36,"symbol":"Kr","name":"Krypton","family":"Noble gas","mass":83.798,"desc":"Inert noble gas."},
+{"z":37,"symbol":"Rb","name":"Rubidium","family":"Alkali metal","mass":85.468,"desc":"Soft, highly reactive metal."},
+{"z":38,"symbol":"Sr","name":"Strontium","family":"Alkaline earth metal","mass":87.62,"desc":"Used in fireworks."},
+{"z":39,"symbol":"Y","name":"Yttrium","family":"Transition metal","mass":88.906,"desc":"Used in electronics."},
+{"z":40,"symbol":"Zr","name":"Zirconium","family":"Transition metal","mass":91.224,"desc":"Resistant to corrosion."},
+{"z":41,"symbol":"Nb","name":"Niobium","family":"Transition metal","mass":92.906,"desc":"Used in alloys and superconductors."},
+{"z":42,"symbol":"Mo","name":"Molybdenum","family":"Transition metal","mass":95.95,"desc":"Used in steel alloys."},
+{"z":43,"symbol":"Tc","name":"Technetium","family":"Transition metal","mass":98,"desc":"Radioactive, first artificial element."},
+{"z":44,"symbol":"Ru","name":"Ruthenium","family":"Transition metal","mass":101.07,"desc":"Used in electronics."},
+{"z":45,"symbol":"Rh","name":"Rhodium","family":"Transition metal","mass":102.91,"desc":"Rare, used in catalysts."},
+{"z":46,"symbol":"Pd","name":"Palladium","family":"Transition metal","mass":106.42,"desc":"Catalyst and jewelry."},
+{"z":47,"symbol":"Ag","name":"Silver","family":"Transition metal","mass":107.87,"desc":"Highly conductive metal."},
+{"z":48,"symbol":"Cd","name":"Cadmium","family":"Transition metal","mass":112.41,"desc":"Toxic, used in batteries."},
+{"z":49,"symbol":"In","name":"Indium","family":"Post-transition metal","mass":114.82,"desc":"Soft, used in electronics."},
+{"z":50,"symbol":"Sn","name":"Tin","family":"Post-transition metal","mass":118.71,"desc":"Used as coating for steel."},
+{"z":51,"symbol":"Sb","name":"Antimony","family":"Metalloid","mass":121.76,"desc":"Used in alloys."},
+{"z":52,"symbol":"Te","name":"Tellurium","family":"Metalloid","mass":127.60,"desc":"Rare metalloid."},
+{"z":53,"symbol":"I","name":"Iodine","family":"Halogen","mass":126.90,"desc":"Essential trace element; disinfectant."},
+{"z":54,"symbol":"Xe","name":"Xenon","family":"Noble gas","mass":131.29,"desc":"Heavy noble gas."},
+{"z":55,"symbol":"Cs","name":"Caesium","family":"Alkali metal","mass":132.91,"desc":"Highly reactive metal."},
+{"z":56,"symbol":"Ba","name":"Barium","family":"Alkaline earth metal","mass":137.33,"desc":"Used in drilling fluids."},
+{"z":57,"symbol":"La","name":"Lanthanum","family":"Lanthanide","mass":138.91,"desc":"First of lanthanides."},
+{"z":58,"symbol":"Ce","name":"Cerium","family":"Lanthanide","mass":140.12,"desc":"Used in catalysts."},
+{"z":59,"symbol":"Pr","name":"Praseodymium","family":"Lanthanide","mass":140.91,"desc":"Used in magnets."},
+{"z":60,"symbol":"Nd","name":"Neodymium","family":"Lanthanide","mass":144.24,"desc":"Strong permanent magnets."},
+{"z":61,"symbol":"Pm","name":"Promethium","family":"Lanthanide","mass":145,"desc":"Radioactive lanthanide."},
+{"z":62,"symbol":"Sm","name":"Samarium","family":"Lanthanide","mass":150.36,"desc":"Used in magnets."},
+{"z":63,"symbol":"Eu","name":"Europium","family":"Lanthanide","mass":151.96,"desc":"Used in phosphors."},
+{"z":64,"symbol":"Gd","name":"Gadolinium","family":"Lanthanide","mass":157.25,"desc":"Used in MRI contrast."},
+{"z":65,"symbol":"Tb","name":"Terbium","family":"Lanthanide","mass":158.93,"desc":"Used in electronics."},
+{"z":66,"symbol":"Dy","name":"Dysprosium","family":"Lanthanide","mass":162.50,"desc":"Used in magnets."},
+{"z":67,"symbol":"Ho","name":"Holmium","family":"Lanthanide","mass":164.93,"desc":"Rare earth metal."},
+{"z":68,"symbol":"Er","name":"Erbium","family":"Lanthanide","mass":167.26,"desc":"Used in fiber optics."},
+{"z":69,"symbol":"Tm","name":"Thulium","family":"Lanthanide","mass":168.93,"desc":"Rare and expensive."},
+{"z":70,"symbol":"Yb","name":"Ytterbium","family":"Lanthanide","mass":173.05,"desc":"Used in alloys."},
+{"z":71,"symbol":"Lu","name":"Lutetium","family":"Lanthanide","mass":174.97,"desc":"Dense, rare."},
+{"z":72,"symbol":"Hf","name":"Hafnium","family":"Transition metal","mass":178.49,"desc":"Used in nuclear control rods."},
+{"z":73,"symbol":"Ta","name":"Tantalum","family":"Transition metal","mass":180.95,"desc":"Used in electronics capacitors."},
+{"z":74,"symbol":"W","name":"Tungsten","family":"Transition metal","mass":183.84,"desc":"Very high melting point."},
+{"z":75,"symbol":"Re","name":"Rhenium","family":"Transition metal","mass":186.21,"desc":"High melting point metal."},
+{"z":76,"symbol":"Os","name":"Osmium","family":"Transition metal","mass":190.23,"desc":"Very dense metal."},
+{"z":77,"symbol":"Ir","name":"Iridium","family":"Transition metal","mass":192.22,"desc":"Very corrosion-resistant."},
+{"z":78,"symbol":"Pt","name":"Platinum","family":"Transition metal","mass":195.08,"desc":"Catalyst and jewelry."},
+{"z":79,"symbol":"Au","name":"Gold","family":"Transition metal","mass":196.97,"desc":"Precious metal."},
+{"z":80,"symbol":"Hg","name":"Mercury","family":"Transition metal","mass":200.59,"desc":"Liquid metal at room temp."},
+{"z":81,"symbol":"Tl","name":"Thallium","family":"Post-transition metal","mass":204.38,"desc":"Toxic heavy metal."},
+{"z":82,"symbol":"Pb","name":"Lead","family":"Post-transition metal","mass":207.2,"desc":"Toxic heavy metal."},
+{"z":83,"symbol":"Bi","name":"Bismuth","family":"Post-transition metal","mass":208.98,"desc":"Low toxicity heavy metal."},
+{"z":84,"symbol":"Po","name":"Polonium","family":"Metalloid","mass":209,"desc":"Radioactive element."},
+{"z":85,"symbol":"At","name":"Astatine","family":"Halogen","mass":210,"desc":"Very rare radioactive halogen."},
+{"z":86,"symbol":"Rn","name":"Radon","family":"Noble gas","mass":222,"desc":"Radioactive noble gas."},
+{"z":87,"symbol":"Fr","name":"Francium","family":"Alkali metal","mass":223,"desc":"Extremely rare and radioactive."},
+{"z":88,"symbol":"Ra","name":"Radium","family":"Alkaline earth metal","mass":226,"desc":"Radioactive alkaline earth."},
+{"z":89,"symbol":"Ac","name":"Actinium","family":"Actinide","mass":227,"desc":"Radioactive actinide."},
+{"z":90,"symbol":"Th","name":"Thorium","family":"Actinide","mass":232.04,"desc":"Radioactive, potential fuel."},
+{"z":91,"symbol":"Pa","name":"Protactinium","family":"Actinide","mass":231.04,"desc":"Rare radioactive element."},
+{"z":92,"symbol":"U","name":"Uranium","family":"Actinide","mass":238.03,"desc":"Used as nuclear fuel."},
+{"z":93,"symbol":"Np","name":"Neptunium","family":"Actinide","mass":237,"desc":"Radioactive actinide."},
+{"z":94,"symbol":"Pu","name":"Plutonium","family":"Actinide","mass":244,"desc":"Radioactive, used in reactors/weapons."},
+{"z":95,"symbol":"Am","name":"Americium","family":"Actinide","mass":243,"desc":"Used in smoke detectors."},
+{"z":96,"symbol":"Cm","name":"Curium","family":"Actinide","mass":247,"desc":"Radioactive, synthetic."},
+{"z":97,"symbol":"Bk","name":"Berkelium","family":"Actinide","mass":247,"desc":"Synthetic radioactive."},
+{"z":98,"symbol":"Cf","name":"Californium","family":"Actinide","mass":251,"desc":"Highly radioactive."},
+{"z":99,"symbol":"Es","name":"Einsteinium","family":"Actinide","mass":252,"desc":"Synthetic radioisotope."},
+{"z":100,"symbol":"Fm","name":"Fermium","family":"Actinide","mass":257,"desc":"Synthetic, rare."},
+{"z":101,"symbol":"Md","name":"Mendelevium","family":"Actinide","mass":258,"desc":"Synthetic element."},
+{"z":102,"symbol":"No","name":"Nobelium","family":"Actinide","mass":259,"desc":"Synthetic element."},
+{"z":103,"symbol":"Lr","name":"Lawrencium","family":"Actinide","mass":266,"desc":"Synthetic element."},
+{"z":104,"symbol":"Rf","name":"Rutherfordium","family":"Transition metal","mass":267,"desc":"Synthetic element."},
+{"z":105,"symbol":"Db","name":"Dubnium","family":"Transition metal","mass":268,"desc":"Synthetic element."},
+{"z":106,"symbol":"Sg","name":"Seaborgium","family":"Transition metal","mass":269,"desc":"Synthetic element."},
+{"z":107,"symbol":"Bh","name":"Bohrium","family":"Transition metal","mass":270,"desc":"Synthetic element."},
+{"z":108,"symbol":"Hs","name":"Hassium","family":"Transition metal","mass":269,"desc":"Synthetic element."},
+{"z":109,"symbol":"Mt","name":"Meitnerium","family":"Unknown","mass":278,"desc":"Very unstable synthetic."},
+{"z":110,"symbol":"Ds","name":"Darmstadtium","family":"Unknown","mass":281,"desc":"Synthetic element."},
+{"z":111,"symbol":"Rg","name":"Roentgenium","family":"Unknown","mass":282,"desc":"Synthetic element."},
+{"z":112,"symbol":"Cn","name":"Copernicium","family":"Unknown","mass":285,"desc":"Synthetic."},
+{"z":113,"symbol":"Nh","name":"Nihonium","family":"Unknown","mass":286,"desc":"Synthetic."},
+{"z":114,"symbol":"Fl","name":"Flerovium","family":"Unknown","mass":289,"desc":"Synthetic."},
+{"z":115,"symbol":"Mc","name":"Moscovium","family":"Unknown","mass":290,"desc":"Synthetic."},
+{"z":116,"symbol":"Lv","name":"Livermorium","family":"Unknown","mass":293,"desc":"Synthetic."},
+{"z":117,"symbol":"Ts","name":"Tennessine","family":"Halogen?","mass":294,"desc":"Synthetic; properties uncertain."},
+{"z":118,"symbol":"Og","name":"Oganesson","family":"Noble gas?","mass":294,"desc":"Synthetic; likely a noble gas."}
+];
+
+/* ------------------------------
+   Predefined alloys/compounds
+   ------------------------------ */
+const PREDEFINED = [
+  {symbols:['Fe','C'], name:'Aço (Steel)', kind:'Alloy'},
+  {symbols:['Cu','Sn'], name:'Bronze', kind:'Alloy'},
+  {symbols:['Cu','Zn'], name:'Latão (Brass)', kind:'Alloy'},
+  {symbols:['Fe','Cr','Ni'], name:'Aço inoxidável', kind:'Alloy'},
+  {symbols:['Al','Cu','Mg'], name:'Duralumin', kind:'Alloy'},
+  {symbols:['Ni','Cr'], name:'Nicromo', kind:'Alloy'},
+  {symbols:['Sn','Pb'], name:'Solda', kind:'Alloy'},
+  {symbols:['Cu','Au'], name:'Electrum', kind:'Alloy'},
+  {symbols:['Na','Cl'], name:'Cloreto de sódio (NaCl)', kind:'Sal'},
+  {symbols:['H','Cl'], name:'Ácido clorídrico (simpl.)', kind:'Ácido'}
+];
+
+/* ------------------------------
+   App state
+   ------------------------------ */
+let workspace = []; // itens: {id,type:'element'|'compound'|'powder', data or elements..., name, kind}
+const elMap = new Map(ELEMENTS.map(e=>[e.symbol,e]));
+
+/* ------------------------------
+   Utils
+   ------------------------------ */
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6) }
+
+function elementPattern(el){
+  let seed = el.z * 2654435761 | 0;
+  for(let i=0;i<el.symbol.length;i++) seed ^= el.symbol.charCodeAt(i)*(i+1);
+  let bits = '';
+  for(let i=0;i<64;i++){
+    seed ^= (seed<<13);
+    seed ^= (seed>>>17);
+    seed ^= (seed<<5);
+    bits += ((seed & 1) ? '1' : '0');
+    seed = ((seed>>>1) | ((seed&1)<<31))>>>0;
+  }
+  return bits;
+}
+
+function familyClass(f){ return 'f-'+f.replace(/ /g,'\\ ') }
+
+/* ------------------------------
+   Rendering sidebar list
+   ------------------------------ */
+const listRoot = document.getElementById('list');
+function renderList(q=''){
+  listRoot.innerHTML='';
+  const qq = (q||'').trim().toLowerCase();
+  const items = ELEMENTS.filter(e => e.name.toLowerCase().includes(qq) || e.symbol.toLowerCase().includes(qq));
+  for(const el of items){
+    const row = document.createElement('div');
+    row.className='el-item';
+    row.draggable = true;
+    row.ondragstart = (ev) => {
+      ev.dataTransfer.setData('application/json', JSON.stringify({from:'sidebar', symbol: el.symbol}));
+      ev.dataTransfer.effectAllowed = 'copy';
+    };
+    const left = document.createElement('div'); left.className='el-left';
+    const badge = document.createElement('div'); badge.className='badge-symbol '+familyClass(el.family); badge.textContent = el.symbol;
+    const meta = document.createElement('div'); meta.className='el-meta';
+    const nm = document.createElement('div'); nm.className='el-name'; nm.textContent = el.name;
+    const sub = document.createElement('div'); sub.className='el-sub'; sub.textContent = el.symbol + ' • #' + el.z;
+    meta.appendChild(nm); meta.appendChild(sub);
+    left.appendChild(badge); left.appendChild(meta);
+    const famc = document.createElement('div'); famc.className='family-color '+familyClass(el.family);
+    row.appendChild(left); row.appendChild(famc);
+    listRoot.appendChild(row);
+  }
+}
+
+/* ------------------------------
+   Rendering workspace
+   ------------------------------ */
+const grid = document.getElementById('grid');
+
+function renderWorkspace(){
+  grid.innerHTML='';
+  for(const it of workspace){
+    const card = document.createElement('div'); card.className='card';
+    card.draggable = true;
+    card.dataset.id = it.id;
+    card.ondragstart = ev => {
+      ev.dataTransfer.setData('application/json', JSON.stringify({from:'workspace', id: it.id}));
+      ev.dataTransfer.effectAllowed='move';
+    };
+    card.ondragover = ev => ev.preventDefault();
+    card.ondrop = ev => handleDropOnCard(ev, it.id);
+    card.ondragenter = ev => card.classList.add('hovering');
+    card.ondragleave = ev => card.classList.remove('hovering');
+
+    const top = document.createElement('div'); top.className='card-top';
+    const left = document.createElement('div');
+    if(it.type==='element'){
+      left.innerHTML = `<div class="sym">${it.data.symbol}</div><div class="meta">${it.data.name}</div>`;
+      const gridbits = makeBitGrid(elementPattern(it.data));
+      card.appendChild(top);
+      top.appendChild(left);
+      card.appendChild(gridbits);
+      const ctrl = document.createElement('div'); ctrl.style.marginTop='8px';
+      ctrl.innerHTML = `<button class="btn secondary" onclick="viewItem('${it.id}')">Ver</button>`;
+      card.appendChild(ctrl);
+    } else if(it.type==='compound'){
+      left.innerHTML = `<div style="font-weight:700">${it.name}</div><div class="meta">${it.kind}</div>`;
+      card.appendChild(top);
+      top.appendChild(left);
+      const compInfo = document.createElement('div'); compInfo.style.fontSize='13px'; compInfo.style.color='var(--muted)';
+      compInfo.textContent = 'Componentes: ' + it.elements.map(e=>e.symbol).join(', ');
+      card.appendChild(compInfo);
+      const ctrl = document.createElement('div'); ctrl.style.marginTop='8px';
+      ctrl.innerHTML = `<button class="btn secondary" onclick="viewItem('${it.id}')">Ver</button>`;
+      card.appendChild(ctrl);
+    } else if(it.type==='powder'){
+      left.innerHTML = `<div style="font-weight:800">lixo</div><div class="meta">Pilha de pó</div>`;
+      top.appendChild(left);
+      card.appendChild(top);
+    }
+
+    // allow dragging card back to sidebar to remove
+    card.ondragend = (ev) => {
+      // nothing here; removal handled on sidebar drop
+      card.classList.remove('hovering');
+    };
+
+    grid.appendChild(card);
+  }
+}
+
+/* build 8x8 bit grid element */
+function makeBitGrid(pattern){
+  const container = document.createElement('div'); container.className='bitgrid';
+  for(let r=0;r<8;r++){
+    const row = document.createElement('div'); row.className='bitrow';
+    for(let c=0;c<8;c++){
+      const idx = r*8 + c;
+      const b = document.createElement('div'); b.className = 'bitcell' + (pattern[idx]==='1' ? ' on' : '');
+      row.appendChild(b);
+    }
+    container.appendChild(row);
+  }
+  return container;
+}
+
+/* ------------------------------
+   Drag/drop logic
+   ------------------------------ */
+/* drop to stage from sidebar creates instance */
+const stage = document.getElementById('stage');
+stage.ondrop = (ev) => {
+  ev.preventDefault();
+  const j = ev.dataTransfer.getData('application/json'); if(!j) return;
+  try{
+    const p = JSON.parse(j);
+    if(p.from==='sidebar'){
+      const el = elMap.get(p.symbol);
+      if(!el) return;
+      workspace.push({id:uid(), type:'element', data: el});
+      renderWorkspace();
+    }
+  }catch(e){}
+};
+
+/* sidebar accepts drop from workspace to remove */
+const sb = document.getElementById('sidebar');
+sb.ondragover = ev => ev.preventDefault();
+sb.ondrop = ev => {
+  ev.preventDefault();
+  const j = ev.dataTransfer.getData('application/json'); if(!j) return;
+  try{
+    const p = JSON.parse(j);
+    if(p.from==='workspace'){
+      workspace = workspace.filter(x => x.id !== p.id);
+      renderWorkspace();
+    }
+  }catch(e){}
+};
+
+/* drop on card -> combine logic */
+function handleDropOnCard(ev, targetId){
+  ev.preventDefault();
+  const j = ev.dataTransfer.getData('application/json'); if(!j) return;
+  try{
+    const p = JSON.parse(j);
+    if(p.from !== 'workspace') return;
+    const srcId = p.id;
+    if(srcId === targetId) return;
+    const src = workspace.find(x=>x.id===srcId);
+    const tgt = workspace.find(x=>x.id===targetId);
+    if(!src || !tgt) return;
+
+    const gather = (it) => it.type === 'element' ? [it.data] : it.elements;
+    const combined = [...gather(src), ...gather(tgt)];
+    const symbols = Array.from(new Set(combined.map(e=>e.symbol)));
+
+    // match predefined by exact symbol set (order-insensitive)
+    let matched = null;
+    for(const pc of PREDEFINED){
+      const need = pc.symbols.slice().sort().join('|');
+      const have = symbols.slice().sort().join('|');
+      if(need === have){ matched = pc; break; }
+    }
+
+    // remove originals
+    workspace = workspace.filter(i => i.id !== srcId && i.id !== targetId);
+
+    if(matched){
+      workspace.push({
+        id: uid(), type: 'compound', name: matched.name, kind: matched.kind,
+        elements: combined, desc: 'Composto reconhecido (pré-definido).'
+      });
+    } else {
+      if(symbols.length >= 2){
+        const name = symbols.join('') + '-mix';
+        workspace.push({
+          id: uid(), type: 'compound', name, kind: 'Mixture / Compound',
+          elements: combined, desc: 'Mistura genérica (não reconhecida).'
+        });
+      } else {
+        workspace.push({ id: uid(), type: 'powder' });
+      }
+    }
+
+    renderWorkspace();
+  }catch(e){
+    console.error(e);
+  }
+}
+
+/* ------------------------------
+   View / modal
+   ------------------------------ */
+const modalRoot = document.getElementById('modalRoot');
+function viewItem(id){
+  const it = workspace.find(x=>x.id===id);
+  if(!it) return;
+  modalRoot.innerHTML = '';
+  const back = document.createElement('div'); back.className='modal-back';
+  back.onclick = closeModal;
+  const box = document.createElement('div'); box.className='modal';
+  box.onclick = e => e.stopPropagation();
+
+  if(it.type === 'element'){
+    const el = it.data;
+    const neutrons = Math.max(0, Math.round(el.mass) - el.z);
+    box.innerHTML = `<h3>${el.name} (${el.symbol})</h3><div style="color:var(--muted);margin-top:6px">Família: ${el.family} • Massa atômica: ${el.mass}</div><p style="margin-top:10px">${el.desc}</p>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn" onclick="viewAtom('${id}')">Ver átomo</button>
+        <button class="btn secondary" onclick="closeModal()">Fechar</button>
+      </div>`;
+  } else if(it.type === 'compound'){
+    box.innerHTML = `<h3>${it.name}</h3><div style="color:var(--muted);margin-top:6px">${it.kind}</div><p style="margin-top:10px">${it.desc || ''}</p>
+      <div style="margin-top:8px;color:var(--muted)">Elementos: ${it.elements.map(e=>e.name).join(', ')}</div>
+      <div style="display:flex;gap:8px;margin-top:12px"><button class="btn secondary" onclick="closeModal()">Fechar</button></div>`;
+  } else {
+    box.innerHTML = `<h3>lixo</h3><div style="color:var(--muted);margin-top:6px">Pilha de pó</div><p style="margin-top:10px">Gerado por combinação sem solução.</p><div style="margin-top:12px"><button class="btn secondary" onclick="closeModal()">Fechar</button></div>`;
+  }
+
+  back.appendChild(box);
+  modalRoot.appendChild(back);
+}
+
+function viewAtom(id){
+  const it = workspace.find(x=>x.id===id);
+  if(!it || it.type !== 'element') return;
+  const el = it.data; const neutrons = Math.max(0, Math.round(el.mass)-el.z); const electrons = el.z;
+  modalRoot.innerHTML = '';
+  const back = document.createElement('div'); back.className='modal-back'; back.onclick = closeModal;
+  const box = document.createElement('div'); box.className='modal'; box.onclick=e=>e.stopPropagation();
+  box.innerHTML = `<h3>Átomo de ${el.name} (${el.symbol})</h3>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">
+      <div style="padding:10px;border-radius:8px;border:1px solid var(--card-border)"><div style="color:var(--muted)">Prótons</div><div style="font-weight:800">${el.z}</div></div>
+      <div style="padding:10px;border-radius:8px;border:1px solid var(--card-border)"><div style="color:var(--muted)">Nêutrons</div><div style="font-weight:800">${neutrons}</div></div>
+      <div style="padding:10px;border-radius:8px;border:1px solid var(--card-border)"><div style="color:var(--muted)">Elétrons</div><div style="font-weight:800">${electrons}</div></div>
+    </div>
+    <div style="margin-top:12px"><button class="btn secondary" onclick="closeModal()">Fechar</button></div>`;
+  back.appendChild(box); modalRoot.appendChild(back);
+}
+function closeModal(){ modalRoot.innerHTML = ''; }
+
+/* ------------------------------
+   Save workspace as JSON
+   ------------------------------ */
+function saveWorkspace(){
+  const exportItems = workspace.map(it=>{
+    if(it.type==='element') return {type:'element', symbol: it.data.symbol, name: it.data.name};
+    if(it.type==='compound') return {type:'compound', name: it.name, kind: it.kind, elements: it.elements.map(e=>e.symbol)};
+    return {type:'powder', name:'lixo'};
+  });
+  const blob = new Blob([JSON.stringify(exportItems, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='periodic_workspace.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+/* ------------------------------
+   UI bindings
+   ------------------------------ */
+document.getElementById('search').addEventListener('input', e => renderList(e.target.value));
+document.getElementById('clearSearch').addEventListener('click', ()=>{ document.getElementById('search').value=''; renderList(''); });
+
+document.getElementById('toggleSidebar').addEventListener('click', ()=>{
+  document.querySelector('.sidebar').classList.toggle('collapsed');
+});
+
+document.getElementById('clearWorkspace').addEventListener('click', ()=>{ workspace=[]; renderWorkspace(); });
+
+document.getElementById('saveBtn').addEventListener('click', saveWorkspace);
+
+document.getElementById('presetAlloys').addEventListener('click', ()=>{
+  // add a few example compounds to the stage
+  const steel = { id: uid(), type:'compound', name:'Aço (exemplo)', kind:'Alloy', elements: [elMap.get('Fe'), elMap.get('C')], desc:'Exemplo de aço'};
+  const bronze = { id: uid(), type:'compound', name:'Bronze (exemplo)', kind:'Alloy', elements: [elMap.get('Cu'), elMap.get('Sn')], desc:'Exemplo de bronze'};
+  workspace.push({id:uid(), type:'element', data: elMap.get('Fe')});
+  workspace.push({id:uid(), type:'element', data: elMap.get('C')});
+  workspace.push(steel, bronze);
+  renderWorkspace();
+});
+
+/* theme toggle */
+const themeToggle = document.getElementById('themeToggle');
+themeToggle.addEventListener('click', ()=>{
+  const root = document.body;
+  if(root.getAttribute('data-theme') === 'dark'){ root.setAttribute('data-theme','light'); themeToggle.textContent = 'Modo escuro'; }
+  else { root.setAttribute('data-theme','dark'); themeToggle.textContent = 'Modo claro'; }
+});
+
+/* initial render */
+renderList('');
+renderWorkspace();
+
+/* expose some functions to window for inline onclick in created HTML (view buttons) */
+window.viewItem = viewItem;
+window.viewAtom = viewAtom;
+window.closeModal = closeModal;
+window.saveWorkspace = saveWorkspace;
+</script>
+</body>
+</html>
